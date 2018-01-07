@@ -1,3 +1,4 @@
+import math
 import tensorflow as tf
 
 
@@ -121,12 +122,12 @@ def capsule_conv(inputs, activation, kernel_size, stride, channels_out,
          channels_in])
 
     output_poses, output_actives = conv_em_routing(
-        conv_active, conv_votes, routing_iters)
+        conv_active, conv_votes, stride, routing_iters)
 
     return output_poses, output_actives
 
 
-def conv_em_routing(activation, conv_votes, routing_iters):
+def conv_em_routing(activation, conv_votes, stride, routing_iters):
     """EM routing algorithm of CapsuleEM.
 
     Args:
@@ -137,6 +138,7 @@ def conv_em_routing(activation, conv_votes, routing_iters):
             Shape: [batch, output_height, output_width, channels_out,
                     kernel_size ** 2, channels_in,
                     pose_height * pose_width]
+        stride (int): Stride of the convolution layer before routing.
         routing_iters (int): Number of routing iterations to do.
 
     Returns:
@@ -148,28 +150,71 @@ def conv_em_routing(activation, conv_votes, routing_iters):
     """
     # initialze r
     r = tf.ones(conv_votes.shape[:3] + [conv_votes.shape[4]])
-    r = _renorm_r(r, conv_votes.shape)
+    r = _renorm_r(r, stride)
 
     # start EM loop
     # [TODO] Schedule inv_tempt (lambda).
     inv_tempt = 1
     for i in range(routing_iters):
         m, s, a_prime = _conv_m_step(r, activation, conv_votes, inv_tempt)
-        r = _conv_e_step(m, s, a_prime, conv_votes)
+        r = _conv_e_step(m, s, a_prime, conv_votes, stride)
 
     return m, a_prime
 
 
-def _renorm_r(r, input_shape):
+def _renorm_r(r, stride):
     pass
 
 
-def _conv_e_step(m, s, a_prime, v):
-    pass
+def _conv_e_step(m, s, a_prime, v, stride):
+    """E-step of the EM algorithm
+
+    Args:
+        m (tensor): Pose of capsules.
+            Shape: [batch, output_height, output_width, channels_out,
+                    pose_height, pose_width]
+        s (tensor): Standard deviation of capsules.
+            Shape: [batch, output_height, output_width, channels_out,
+                    pose_height * pose_width]
+        a_prime (tensor): Activation of capsules.
+            Shape: [batch, output_height, output_width, channels_out]
+        v (tensor): Votes of lower capsuls.
+            Shape: [batch, output_height, output_width, channels_out,
+                    kernel_size ** 2, channels_in,
+                    pose_height * pose_width]
+        stride (int): Stride of the convolution layer before routing.
+
+    Returns:
+        r (tensor): Expected portion of lower capsule that belong to
+            the upper capsule.
+            Shape: [batch, output_height, output_width, channels_out,
+                    kernel_size ** 2, channels_in]
+    """
+    p_exp = - tf.reduce_sum((v - tf.expand_dims(tf.expand_dims(m, 4), 5)) ** 2
+                            / (2 * tf.expand_dims(tf.expand_dims(s, 4), 5)),
+                            -1)
+    assert p_exp.shape == [
+        v.shape[0],                 # batch
+        v.shape[1],                 # output_height
+        v.shape[2],                 # output_width
+        v.shape[3],                 # channels_out
+        v.shape[4],                 # kernel_size ** 2
+        v.shape[5]]                 # channels_in
+
+    p_denominator = tf.expand_dims(
+        tf.expand_dims(tf.reduce_prod(2 * math.pi * s ** 2, -1),
+                       -1),
+        -1)
+
+    p = tf.exp(p_exp) / p_denominator
+    r = p * tf.expand_dims(tf.expand_dims(a_prime, -1), -1)
+    r = _renorm_r(r, stride)
+
+    return r
 
 
 def _conv_m_step(r, a, v, inv_tempt):
-    """E-step of the EM algorithm
+    """M-step of the EM algorithm
 
     Args:
         r (tensor): Expected portion of lower capsule that belong to
@@ -191,7 +236,7 @@ def _conv_m_step(r, a, v, inv_tempt):
                     pose_height, pose_width]
         s (tensor): Standard deviation of capsules.
             Shape: [batch, output_height, output_width, channels_out,
-                    pose_height, pose_width]
+                    pose_height * pose_width]
         a_prime (tensor): Activation of capsules.
             Shape: [batch, output_height, output_width, channels_out]
     """
