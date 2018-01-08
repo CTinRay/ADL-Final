@@ -195,11 +195,12 @@ def _renorm_r(r, stride):
         for j in range(r_width):
             for ki in range(kernel_size):
                 for kj in range(kernel_size):
-                    higher_indices[i + ki][j + kj].append(
+                    higher_indices[i * stride + ki][j * stride + kj].append(
                         (i, j, ki * kernel_size + kj))
 
     # the max number of upper units that convolve a lower unit
     max_convolved = max([max(map(len, arr)) for arr in higher_indices])
+    pdb.set_trace()
 
     # keep only the batch dimension so we can use tf.gather easily
     r_flattern = tf.reshape(r, [batch_size,
