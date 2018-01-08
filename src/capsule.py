@@ -1,3 +1,4 @@
+import pdb
 import math
 import tensorflow as tf
 
@@ -173,56 +174,67 @@ def _renorm_r(r, stride):
                     kernel_size ** 2, channels_in]
         stride (int): Stride of the convolution layer before routing.
     """
-    kernel_size = math.sqrt(r.shape[-2])
+    kernel_size = math.sqrt(int(r.shape[-2]))
     assert kernel_size.is_integer()
     kernel_size = int(kernel_size)
 
-    origin_h = r.shape[1] * stride + (kernel_size - 1)
-    origin_w = r.shape[2] * stride + (kernel_size - 1)
+    batch_size = tf.shape(r)[0]
+    r_height = int(r.shape[1])
+    r_width = int(r.shape[2])
+    origin_h = r_height * stride + (kernel_size - 1)
+    origin_w = r_width * stride + (kernel_size - 1)
 
-    channels_out = r.shape[3]
-    channels_in = r.shape[-1]
+    channels_out = int(r.shape[3])
+    channels_in = int(r.shape[-1])
 
     # collect indices of higher level units that convolve lower level
     # unit at i, j.
     higher_indices = [[[] for w in range(origin_w)]
                       for h in range(origin_h)]
-    for i in range(r.shape[1]):
-        for j in range(r.shape[2]):
+    for i in range(r_height):
+        for j in range(r_width):
             for ki in range(kernel_size):
                 for kj in range(kernel_size):
-                    higher_indices[i + ki][j + kj].append((i, j))
+                    higher_indices[i + ki][j + kj].append(
+                        (i, j, ki * kernel_size + kj))
 
     # the max number of upper units that convolve a lower unit
     max_convolved = max([max(map(len, arr)) for arr in higher_indices])
 
-    # flattern upper level n-dim indices to 1-dim
+    # keep only the batch dimension so we can use tf.gather easily
+    r_flattern = tf.reshape(r, [batch_size,
+                                r_height * r_width
+                                * channels_out
+                                * kernel_size ** 2
+                                * channels_out])
+
+    # pad r with 0 so zero_index will point to 0
+    r_flattern = tf.concat([r_flattern, tf.zeros([batch_size, 1])], axis=-1)
+
+    # index that point to 0
+    zero_index = int(r_flattern.shape[-1]) - 1
+
     sum_r_indices = []
     for i in range(origin_h):
         for j in range(origin_w):
-            for cout in channels_out:
+            for cout in range(channels_out):
                 for k in range(max_convolved):
-                    for cin in channels_in:
+                    for cin in range(channels_in):
                         if k < len(higher_indices[i][j]):
-                            higher_i, higher_j = higher_indices[i][j]
-                            index = ((((higher_i * r.shape[1] + higher_j)
+                            higher_i, higher_j, k_shift \
+                                = higher_indices[i][j][k]
+                            index = ((((higher_i * r_height + higher_j)
                                        * channels_out + cout)
-                                      * kernel_size ** 2 + k)
+                                      * kernel_size ** 2 + k_shift)
                                      * channels_in + cin)
                             sum_r_indices.append(index)
                         else:
                             # for border units that are convolved less times
                             # append padding index that points to 0
-                            sum_r_indices.append(-1)
-
-    # keep only the batch dimension so we can use tf.gather easily
-    r = r.reshape(r.shape[0], -1)
-
-    # pad r with 0 so index -1 will point to 0
-    r = tf.cat([r, tf.zeros([r.shape[0], 1])], axis=-1)
+                            sum_r_indices.append(zero_index)
 
     # gather r that is contributed from lower layer unit i, j
-    r_gather = tf.gather(r, sum_r_indices, axis=-1)
+    r_gather = tf.gather(r_flattern, sum_r_indices, axis=-1)
     r_gather = tf.reshape(r_gather, [-1,
                                      origin_h,
                                      origin_w,
@@ -230,10 +242,10 @@ def _renorm_r(r, stride):
                                      channels_in])
 
     # summation of r
-    r_sum = tf.reduce_sum(r_gather, -2, keep_dims=True)
+    r_sum = tf.reduce_sum(r_gather, -2)
 
     # collect r_sum
-    conv_r_sum = tf.extract_image_paches(
+    conv_r_sum = tf.extract_image_patches(
         r_sum,
         [1, kernel_size, kernel_size, 1],
         [1, stride, stride, 1],
@@ -243,15 +255,15 @@ def _renorm_r(r, stride):
     # calculate summation of r
     conv_r_sum = tf.reshape(
         conv_r_sum,
-        [r.shape[0],        # batch
-         r.shape[1],        # output_height
-         r.shape[2],        # output_width
+        [batch_size,
+         r_height,
+         r_width,
          kernel_size ** 2,
          channels_in])
 
     # renorm r by divide original r with conv_r_sum
     conv_r_renormed = r / tf.expand_dims(conv_r_sum, 3)
-    assert conv_r_renormed.shape == r
+    assert conv_r_renormed.shape[1:] == r.shape[1:]
 
     return conv_r_renormed
 
