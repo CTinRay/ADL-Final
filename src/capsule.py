@@ -82,12 +82,12 @@ def conv_capsule(inputs, activation, kernel_size, stride, channels_out,
         tf.expand_dims(
             tf.expand_dims(tf.expand_dims(transform_matrices, 1), 1)),
         [1,  # batch dim remains unchanged
-         conv_poses.shape[0],  # output height
-         conv_poses.shape[1],  # output width
+         conv_poses.shape[1],  # output height
+         conv_poses.shape[2],  # output width
          1, 1, 1])
 
     # now the shape of transform matrices should be same as conv_poses
-    assert tiled_transform_matrics.shape == conv_poses
+    assert tiled_transform_matrics.shape[:-2] == conv_poses.shape[:-2]
 
     # so we can do matrix transformation
     conv_votes = tf.matmul(tiled_transform_matrics, conv_poses)
@@ -393,5 +393,103 @@ def _conv_m_step(r, a, v, inv_tempt):
     return m, s, a_prime
 
 
-def class_capsule(self):
-    pass
+def class_capsule(inputs, activation, n_classes,
+                  routing_iters=3):
+    """Build class capsule layer.
+
+    Args:
+        inputs (tensor): Pose of lower layer.
+            Shape: [batch, input_height, input_width, channels_in,
+                    pose_height, pose_width]
+        activation (tensor): Activation of lower layer.
+            Shape: [batch, input_height, input_width, channels_in]
+        n_classes (int): Number of output classes.
+        routing_iters (int): Number of routing iterations,
+
+    Returns:
+        pose (tensor): Output pose tensor.
+            Shape: [batch, n_classes, pose_height, pose_width]
+        activation (tensor): Output activation tensor.
+            Shape: [batch, n_classes]
+    """
+    batch_size = tf.shape(inputs)[0]
+    input_height = inputs.shape[1]
+    input_width = inputs.shape[2]
+    channels_in = inputs.shape[3]
+    pose_shape = inputs.shape[4:6]
+
+    # copy pose of lower level capsules n_classes times
+    poses = tf.stack([inputs] * n_classes, axis=1)
+    # poses.shape: [batch, n_classes, input_height, input_width,
+    #               channels_in, pose_height, pose_width]
+
+    # weights of transform matrices
+    transform_matrices = tf.get_variable(
+        'transform_matrices',
+        shape=[n_classes,
+               channels_in,
+               pose_shape[0],
+               pose_shape[0]])
+
+    # matric transformation
+    tiled_transform_matrics = tf.tile(
+        tf.reshape(transform_matrices,
+                   [1,
+                    n_classes,
+                    1,
+                    1,
+                    channels_in,
+                    pose_shape[0],
+                    pose_shape[0]]),
+        [batch_size,
+         1,   # n_classes
+         input_height,
+         input_width,
+         1,   # channels_in
+         1,   # pose_height
+         1])  # pose_height
+    assert tiled_transform_matrics.shape[1:] == [n_classes,
+                                                 input_height,
+                                                 input_width,
+                                                 channels_in,
+                                                 pose_shape[0],
+                                                 pose_shape[0]]
+
+    # do matrix transformation
+    votes = tf.matmul(tiled_transform_matrics, poses,
+                      name='votes')
+    assert votes.shape[1:] == [n_classes,
+                               input_height,
+                               input_width,
+                               channels_in,
+                               pose_shape[0],
+                               pose_shape[1]]
+
+    # reshape as if lower layer is convolved to 1x1
+    votes = tf.reshape(votes,
+                       [batch_size,
+                        1, 1,
+                        n_classes,
+                        input_height * input_width,
+                        channels_in,
+                        pose_shape[0],
+                        pose_shape[1]])
+    activation = tf.reshape(activation,
+                            [batch_size,
+                             1, 1,
+                             n_classes,
+                             input_height * input_width,
+                             channels_in])
+
+    # do EM-routing
+    output_poses, output_actives = conv_em_routing(activation, votes, 1)
+
+    # flattern results from 2d to 1d
+    output_poses = tf.reshape(output_poses, [batch_size,
+                                             n_classes,
+                                             pose_shape[0],
+                                             pose_shape[1]],
+                              name='output_poses')
+    output_actives = tf.reshape(output_actives, [batch_size, n_classes],
+                                name='output_actives')
+    return output_poses, output_actives
