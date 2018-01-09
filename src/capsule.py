@@ -3,7 +3,7 @@ import math
 import tensorflow as tf
 
 
-def capsule_conv(inputs, activation, kernel_size, stride, channels_out,
+def conv_capsule(inputs, activation, kernel_size, stride, channels_out,
                  routing_iters=3):
     """Build capsule convolution layer.
 
@@ -391,3 +391,7 @@ def _conv_m_step(r, a, v, inv_tempt):
                              v.shape[3]]   # channels_out
 
     return m, s, a_prime
+
+
+def class_capsule(self):
+    pass
