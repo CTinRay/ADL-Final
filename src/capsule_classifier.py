@@ -1,3 +1,4 @@
+import pdb
 import tensorflow as tf
 from capsule import conv_capsule, class_capsule
 from tf_classifier_base import TFClassifierBase
@@ -27,6 +28,9 @@ class CapsuleClassifier(TFClassifierBase):
                  name='y'),
              'training': tf.placeholder(tf.bool, name='training')}
 
+        batch_size = tf.shape(placeholders['x'])[0]
+        img_shape = self._data_shape[0:2]
+
         # conv0
         conv0 = tf.layers.conv2d(
             placeholders['x'],
@@ -37,27 +41,31 @@ class CapsuleClassifier(TFClassifierBase):
             name='conv0')
 
         # primary capsule
-        primary_capsule_pose = tf.layers.conv2d(
-            conv0,
-            self.B * (self.pose_shape[0] * self.pose_shape[1]),
-            1,
-            (1, 1))
-        primary_capsule_pose = tf.reshape(
-            primary_capsule_pose,
-            tf.shape(primary_capsule_pose)[0],
-            primary_capsule_pose.shape[1],
-            primary_capsule_pose.shape[2],
-            self.B,
-            self.pose_shape[0] * self.pose_shape[1],
-            name='primary_capsule_pose')
+        with tf.variable_scope('primary_capsule'):
+            primary_capsule_pose = tf.layers.conv2d(
+                conv0,
+                self.B * (self.pose_shape[0] * self.pose_shape[1]),
+                1,
+                (1, 1))
+            img_shape = _calc_shape(img_shape, stride=2, kernel_size=5)
 
-        primary_capsule_active = tf.layers.conv2d(
-            conv0,
-            self.B * 1,
-            1,
-            (1, 1),
-            activation=tf.nn.sigmoid,
-            name='primary_capsule_active')
+            primary_capsule_pose = tf.reshape(
+                primary_capsule_pose,
+                [tf.shape(primary_capsule_pose)[0],
+                 img_shape[0],
+                 img_shape[1],
+                 self.B,
+                 self.pose_shape[0],
+                 self.pose_shape[1]],
+                name='pose')
+
+            primary_capsule_active = tf.layers.conv2d(
+                conv0,
+                self.B * 1,
+                1,
+                (1, 1),
+                activation=tf.nn.sigmoid,
+                name='activation')
 
         # capsule1
         with tf.variable_scope('capsule1'):
@@ -82,9 +90,7 @@ class CapsuleClassifier(TFClassifierBase):
             class_pose, class_active = class_capsule(
                 conv_capsule2_pose,
                 conv_capsule2_active,
-                kernel_size=3,
-                stride=1,
-                n_classes=self.n_classes)
+                n_classes=int(self._n_classes))
 
         logits = class_active
         return placeholders, logits
@@ -92,3 +98,13 @@ class CapsuleClassifier(TFClassifierBase):
     def _loss(self, placeholder_y, logits):
         return tf.losses.sparse_softmax_cross_entropy(placeholder_y,
                                                       logits)
+
+
+def _calc_shape(original_shape, stride, kernel_size):
+    """
+    Helper function that calculate image height and width after convolution.
+    """
+    shape = [(original_shape[0] - kernel_size) // stride + 1,
+             (original_shape[1] - kernel_size) // stride + 1]
+
+    return shape

@@ -9,7 +9,7 @@ def conv_capsule(inputs, activation, kernel_size, stride, channels_out,
 
     Args:
         inputs (tensor): Pose of lower layer.
-            Shape: [batch, input_height, input_width, n_channels_in,
+            Shape: [batch, input_height, input_width, channels_in,
                     pose_height, pose_width]
         activation (tensor): Activation of lower layer.
             Shape: [batch, input_height, input_width, channels_in]
@@ -26,104 +26,133 @@ def conv_capsule(inputs, activation, kernel_size, stride, channels_out,
             Shape: [batch, output_height, output_width, channels_out]
     """
 
-    channels_in = inputs.shape[-3]
-    pose_shape = inputs.shape[-2:]
+    batch_size = tf.shape(inputs)[0]
+    input_height = int(inputs.shape[1])
+    input_width = int(inputs.shape[2])
+    channels_in = int(inputs.shape[3])
+    pose_shape = (int(inputs.shape[4]), int(inputs.shape[5]))
+    output_height = (input_height - kernel_size) // stride + 1
+    output_width = (input_width - kernel_size) // stride + 1
 
-    # flattern inputs to shape
-    # [batch, input_height, input_width,
-    #  channels_in * pose_height * pose_width]
+    # flattern inputs to 4d shape
     # so we can use convolution function for image.
     inputs = tf.reshape(
         inputs,
-        [inputs.shape[0], inputs.shape[1], inputs.shape[2], -1])
+        [batch_size,
+         input_height,
+         input_width,
+         channels_in * pose_shape[0] * pose_shape[1]])
 
     # collect pose matrices convolved by upper layer capsules
-    conv_poses = tf.extract_image_paches(
+    conv_poses = tf.extract_image_patches(
         inputs,
         [1, kernel_size, kernel_size, 1],
         [1, stride, stride, 1],
         [1, 1, 1, 1],
         'VALID')
-    assert conv_poses.shape == [
-        inputs.shape[0],  # batch
-        (inputs.shape[1] - kernel_size) // stride + 1,  # output height
-        (inputs.shape[2] - kernel_size) // stride + 1,  # output width
-        kernel_size ** 2 * channels_in * pose_shape[0] * pose_shape[1]]
+    conv_poses.set_shape([
+        None,
+        output_height,
+        output_width,
+        kernel_size ** 2 * channels_in
+        * pose_shape[0] * pose_shape[1]])
 
     # seperate out dimension for poses matrices, so we can do matrix operation.
     conv_poses = tf.reshape(
         conv_poses,
-        [conv_poses.shape[0],
-         conv_poses.shape[1],
+        [batch_size,
+         output_height,
+         output_width,
          kernel_size ** 2 * channels_in,
          pose_shape[0],
          pose_shape[1]])
 
     # repeat poses for each output channels
-    conv_poses = tf.cat([inputs] * channels_out, 2)
-
-    assert conv_poses.shape == [
-        inputs.shape[0],  # batch
-        (inputs.shape[1] - kernel_size) // stride + 1,  # output height
-        (inputs.shape[2] - kernel_size) // stride + 1,  # output width
-        channels_out * kernel_size ** 2 * channels_in,
-        pose_shape[0],
-        pose_shape[1]]
+    conv_poses = tf.tile(conv_poses, [1, 1, 1,
+                                      channels_out,
+                                      1, 1])
+    # conv_poses.shape == [
+    #     batch,
+    #     output_height,
+    #     output_width,
+    #     channels_out * kernel_size ** 2 * channels_in,
+    #     pose_shape[0],
+    #     pose_shape[1]]
 
     # weights of transform matrices
     transform_matrices = tf.get_variable(
         'transform_matrices',
-        shape=[channels_out * kernel_size ** 2 * channels_in,
+        shape=[channels_out,
+               kernel_size ** 2,
+               channels_in,
                pose_shape[1],
                pose_shape[1]])
+    transform_matrices = tf.reshape(
+        transform_matrices,
+        [1,  # batch_size
+         1,
+         1,
+         channels_out * kernel_size ** 2 * channels_in,
+         pose_shape[1],
+         pose_shape[1]])
 
     # matric transformation
     tiled_transform_matrics = tf.tile(
-        tf.expand_dims(
-            tf.expand_dims(tf.expand_dims(transform_matrices, 1), 1)),
-        [1,  # batch dim remains unchanged
-         conv_poses.shape[1],  # output height
-         conv_poses.shape[2],  # output width
+        transform_matrices,
+        [batch_size,
+         output_height,
+         output_width,
          1, 1, 1])
 
     # now the shape of transform matrices should be same as conv_poses
-    assert tiled_transform_matrics.shape[:-2] == conv_poses.shape[:-2]
+    # tiled_transform_matrics.shape[:-2] == conv_poses.shape[:-2]
 
     # so we can do matrix transformation
     conv_votes = tf.matmul(tiled_transform_matrics, conv_poses)
 
     # collect activation convolved by upper layer capsules
-    conv_active = tf.extract_image_paches(
+    conv_active = tf.extract_image_patches(
         activation,
         [1, kernel_size, kernel_size, 1],
         [1, stride, stride, 1],
         [1, 1, 1, 1],
         'VALID')
-    assert conv_poses.shape == [
-        conv_votes.shape[0],  # batch
-        conv_votes.shape[1],  # output height
-        conv_votes.shape[2],  # output width
-        kernel_size ** 2 * channels_in]
+    # conv_poses.shape == [
+    #     batch,
+    #     output_height,
+    #     output_width,
+    #     kernel_size ** 2 * channels_in]
 
     # start doing EM routing
     conv_votes = tf.reshape(
         conv_votes,
-        [conv_votes.shape[0],  # batch
-         conv_votes.shape[1],  # output_height
-         conv_votes.shape[2],  # output_width
-         channels_out * kernel_size ** 2,
+        [batch_size,
+         output_height,
+         output_width,
+         channels_out,
+         kernel_size ** 2,
          channels_in,
          pose_shape[0] * pose_shape[1]])
     conv_active = tf.reshape(
         conv_active,
-        [conv_active.shape[0],  # batch
-         conv_active.shape[1],  # output_height
-         conv_active.shape[2],  # output_width
+        [batch_size,
+         output_height,
+         output_width,
          kernel_size ** 2,
          channels_in])
 
-    output_poses, output_actives = conv_em_routing(
-        conv_active, conv_votes, stride, routing_iters)
+    with tf.variable_scope('em_routing', reuse=tf.AUTO_REUSE):
+        output_poses, output_actives = conv_em_routing(
+            conv_active, conv_votes, stride, routing_iters)
+
+    output_poses = tf.reshape(
+        output_poses,
+        [batch_size,
+         output_height,
+         output_width,
+         channels_out,
+         pose_shape[0],
+         pose_shape[1]])
 
     return output_poses, output_actives
 
@@ -150,7 +179,13 @@ def conv_em_routing(activation, conv_votes, stride, routing_iters):
             Shape: [batch, output_height, output_width, channels_out]
     """
     # initialze r
-    r = tf.ones(conv_votes.shape[:3] + [conv_votes.shape[4]])
+    r = tf.ones([tf.shape(conv_votes)[0],    # batch
+                 int(conv_votes.shape[1]),   # output_height
+                 int(conv_votes.shape[2]),   # output_width
+                 int(conv_votes.shape[3]),   # channels_out
+                 int(conv_votes.shape[4]),   # kernel_size ** 2
+                 int(conv_votes.shape[5])],  # channels_in
+                name='r_init')
     r = _renorm_r(r, stride)
 
     # start EM loop
@@ -200,14 +235,13 @@ def _renorm_r(r, stride):
 
     # the max number of upper units that convolve a lower unit
     max_convolved = max([max(map(len, arr)) for arr in higher_indices])
-    pdb.set_trace()
 
     # keep only the batch dimension so we can use tf.gather easily
     r_flattern = tf.reshape(r, [batch_size,
                                 r_height * r_width
                                 * channels_out
                                 * kernel_size ** 2
-                                * channels_out])
+                                * channels_in])
 
     # pad r with 0 so zero_index will point to 0
     r_flattern = tf.concat([r_flattern, tf.zeros([batch_size, 1])], axis=-1)
@@ -297,8 +331,7 @@ def _conv_e_step(m, s, a_prime, v, stride):
     p_exp = - tf.reduce_sum((v - tf.expand_dims(tf.expand_dims(m, 4), 5)) ** 2
                             / (2 * tf.expand_dims(tf.expand_dims(s, 4), 5)),
                             -1)
-    assert p_exp.shape == [
-        v.shape[0],                 # batch
+    assert p_exp.shape[1:] == [
         v.shape[1],                 # output_height
         v.shape[2],                 # output_width
         v.shape[3],                 # channels_out
@@ -345,50 +378,45 @@ def _conv_m_step(r, a, v, inv_tempt):
             Shape: [batch, output_height, output_width, channels_out]
     """
     r_prime = r * tf.expand_dims(a, 3)
-    assert r_prime.shape == r.shape
+    assert r_prime.shape[1:] == r.shape[1:]
 
-    sum_rv = tf.reduce_sum(
-        tf.reduce_sum(tf.expand_dims(r_prime, -1) * v, axis=-2),
-        axis=-1)
-    assert sum_rv.shape == [
-        v.shape[0],                 # batch
-        v.shape[1],                 # output_height
-        v.shape[2],                 # output_width
-        v.shape[3],                 # channels_out
-        v.shape[-2] * v.shape[-1]]  # pose_height * pose_width
+    sum_rv = tf.reduce_sum(tf.expand_dims(r_prime, -1) * v, axis=[-2, -3])
+    assert sum_rv.shape[1:] == [
+        v.shape[1],   # output_height
+        v.shape[2],   # output_width
+        v.shape[3],   # channels_out
+        v.shape[-1]]  # pose_height * pose_width
 
     sum_r = tf.expand_dims(
         tf.reduce_sum(tf.reduce_sum(r_prime, 5), 4), -1)
-    assert sum_r.shape == [v.shape[0],   # batch
-                           v.shape[1],   # output_height
-                           v.shape[2],   # output_width
-                           v.shape[3],   # channels_out
-                           1]            # for broadcast
+    assert sum_r.shape[1:] == [v.shape[1],   # output_height
+                               v.shape[2],   # output_width
+                               v.shape[3],   # channels_out
+                               1]            # for broadcast
 
     m = sum_rv / sum_r
-    assert m.shape == sum_rv.shape
+    assert m.shape[1:] == sum_rv.shape[1:]
 
     r_square_v_minus_m = \
         tf.expand_dims(r_prime, -1) \
         * (v - (tf.expand_dims(tf.expand_dims(m, 4), 5))) ** 2
     sum_r_square_v_minus_m = tf.reduce_sum(
         tf.reduce_sum(r_square_v_minus_m, 5), 4)
-    assert sum_r_square_v_minus_m.shape == m.shape
+    assert sum_r_square_v_minus_m.shape[1:] == m.shape[1:]
 
     square_s = sum_r_square_v_minus_m / sum_r
     s = tf.sqrt(square_s)
-    assert s.shape == m.shape
+    assert s.shape[1:] == m.shape[1:]
 
-    beta_v = tf.get_variable('beta_v')
+    beta_v = tf.get_variable('beta_v', [1])
     cost = (beta_v + tf.log(s)) * sum_r
 
-    beta_a = tf.get_variable('beta_a')
+    beta_a = tf.get_variable('beta_a', [1])
     a_prime = tf.sigmoid(inv_tempt *
-                         (beta_a - tf.reduce_sum(tf.reduce_sum(cost, -2), -1)))
-    assert a_prime.shape == [v.shape[0],   # batch
-                             v.shape[1],   # output_height
-                             v.shape[2],   # output_width
-                             v.shape[3]]   # channels_out
+                         (beta_a - tf.reduce_sum(cost, -1)))
+    assert a_prime.shape[1:] == [v.shape[1],   # output_height
+                                 v.shape[2],   # output_width
+                                 v.shape[3]]   # channels_out
 
     return m, s, a_prime
 
@@ -482,7 +510,8 @@ def class_capsule(inputs, activation, n_classes,
                              channels_in])
 
     # do EM-routing
-    output_poses, output_actives = conv_em_routing(activation, votes, 1)
+    with tf.variable_scope('em_routing', reuse=tf.AUTO_REUSE):
+        output_poses, output_actives = conv_em_routing(activation, votes, 1)
 
     # flattern results from 2d to 1d
     output_poses = tf.reshape(output_poses, [batch_size,
