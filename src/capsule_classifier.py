@@ -4,12 +4,13 @@ from tf_classifier_base import TFClassifierBase
 
 
 class CapsuleClassifier(TFClassifierBase):
-    def __init__(self, A=32, B=32, C=32, D=32, **kwargs):
+    def __init__(self, *args, A=32, B=32, C=32, D=32, **kwargs):
         self.A = A
         self.B = B
         self.C = C
         self.D = D
         self.pose_shape = [4, 4]
+        super(CapsuleClassifier, self).__init__(*args)
 
     def _build_model(self):
         placeholders = \
@@ -83,7 +84,7 @@ class CapsuleClassifier(TFClassifierBase):
                 conv_capsule2_active,
                 kernel_size=3,
                 stride=1,
-                channels_out=self.n_classes)
+                n_classes=self.n_classes)
 
         logits = class_active
         return placeholders, logits
