@@ -30,7 +30,7 @@ class TFClassifierBase:
 
         # run batches for train
         loss = 0
-        for b in tqdm(range(X.shape[0] // self._batch_size + 1)):
+        for b in tqdm(range(X.shape[0] // self._batch_size)):
             batch = next(batch_generator)
             feed_dict = {self._placeholders['x']: batch['x'],
                          self._placeholders['y']: batch['y']}
@@ -71,7 +71,7 @@ class TFClassifierBase:
                  n_epochs=10, valid=None,
                  embedding=None, early_stop=None,
                  reg_constant=0.0,
-                 gpu_memory_fraction=0.2):
+                 gpu_memory_fraction=None):
 
         self._data_shape = data_shape
         self._n_classes = n_classes
@@ -89,10 +89,13 @@ class TFClassifierBase:
         self._epoch = 0
 
         # limit GPU memory usage
-        gpu_options = tf.GPUOptions(
-            per_process_gpu_memory_fraction=gpu_memory_fraction)
-        self._session = tf.Session(
-            config=tf.ConfigProto(gpu_options=gpu_options))
+        config = tf.ConfigProto()
+        if gpu_memory_fraction is not None:
+            config.gpu_options.per_process_gpu_memory_fraction = 0.4
+        else:
+            config.gpu_options.allow_growth = True
+
+        self._session = tf.Session(config=config)
 
         # build graph
         with tf.variable_scope('TF-Classifier') as scope:
