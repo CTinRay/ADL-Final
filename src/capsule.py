@@ -441,15 +441,16 @@ def class_capsule(inputs, activation, n_classes,
             Shape: [batch, n_classes]
     """
     batch_size = tf.shape(inputs)[0]
-    input_height = inputs.shape[1]
-    input_width = inputs.shape[2]
-    channels_in = inputs.shape[3]
-    pose_shape = inputs.shape[4:6]
+    input_height = int(inputs.shape[1])
+    input_width = int(inputs.shape[2])
+    channels_in = int(inputs.shape[3])
+    pose_shape = int(inputs.shape[4]), int(inputs.shape[5])
 
     # copy pose of lower level capsules n_classes times
-    poses = tf.stack([inputs] * n_classes, axis=1)
-    # poses.shape: [batch, n_classes, input_height, input_width,
-    #               channels_in, pose_height, pose_width]
+    poses = tf.tile(tf.expand_dims(inputs, axis=1),
+                    [1, n_classes, 1, 1, 1, 1, 1])
+    assert poses.shape[1:] == [n_classes, input_height, input_width,
+                               channels_in, pose_shape[0], pose_shape[1]]
 
     # weights of transform matrices
     transform_matrices = tf.get_variable(
@@ -500,18 +501,17 @@ def class_capsule(inputs, activation, n_classes,
                         n_classes,
                         input_height * input_width,
                         channels_in,
-                        pose_shape[0],
-                        pose_shape[1]])
+                        pose_shape[0] * pose_shape[1]])
     activation = tf.reshape(activation,
                             [batch_size,
                              1, 1,
-                             n_classes,
                              input_height * input_width,
                              channels_in])
 
     # do EM-routing
     with tf.variable_scope('em_routing', reuse=tf.AUTO_REUSE):
-        output_poses, output_actives = conv_em_routing(activation, votes, 1)
+        output_poses, output_actives = conv_em_routing(
+            activation, votes, 1, routing_iters)
 
     # flattern results from 2d to 1d
     output_poses = tf.reshape(output_poses, [batch_size,
