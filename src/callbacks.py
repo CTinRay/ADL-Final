@@ -53,7 +53,11 @@ class LogCallback(Callback):
                                    'w', buffering=1)
 
     def on_epoch_end(self, log_train, log_valid, model):
-        self._fp_train_acc.write('%f\n' % log_train['accuracy'])
-        self._fp_train_loss.write('%f\n' % log_train['loss'])
-        self._fp_valid_acc.write('%f\n' % log_valid['accuracy'])
-        self._fp_valid_loss.write('%f\n' % log_valid['loss'])
+        self._fp_train_acc.write('{},{}\n'
+                                 .format(model._epoch, log_train['accuracy']))
+        self._fp_train_loss.write('{},{}\n'
+                                  .format(model._epoch, log_train['loss']))
+        self._fp_valid_acc.write('{},{}\n'
+                                 .format(model._epoch, log_valid['accuracy']))
+        self._fp_valid_loss.write('{},{}\n'
+                                  .format(model._epoch, log_valid['loss']))
