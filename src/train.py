@@ -7,6 +7,7 @@ import numpy as np
 from IPython.terminal.embed import embed
 from capsule_classifier import CapsuleClassifier
 from matrix_cnn_classifier import MatrixCNNClassifier
+from cnn_classifier import CNNClassifier
 from callbacks import ModelCheckpoint, LogCallback
 from dataset import SmallNORBDataset
 
@@ -18,16 +19,25 @@ def main(args):
 
     train, valid = smallnorb.get_train_valid()
 
-    # classifier = CapsuleClassifier(train['x'].shape[1:],
-    #                                np.max(train['y']) + 1,
-    #                                valid=valid,
-    #                                batch_size=128,
-    #                                n_epochs=100)
-    classifier = MatrixCNNClassifier(train['x'].shape[1:],
-                                     np.max(train['y']) + 1,
-                                     valid=valid,
-                                     batch_size=128,
-                                     n_epochs=100)
+    if args.arch == 'matrix_capsule':
+        classifier = CapsuleClassifier(train['x'].shape[1:],
+                                       np.max(train['y']) + 1,
+                                       valid=valid,
+                                       batch_size=args.batch_size,
+                                       n_epochs=100)
+    elif args.arch == 'matrix_cnn':
+        classifier = MatrixCNNClassifier(train['x'].shape[1:],
+                                         np.max(train['y']) + 1,
+                                         valid=valid,
+                                         batch_size=args.batch_size,
+                                         n_epochs=100)
+    elif args.arch == 'cnn':
+        classifier = CNNClassifier(train['x'].shape[1:],
+                                   np.max(train['y']) + 1,
+                                   valid=valid,
+                                   batch_size=args.batch_size,
+                                   n_epochs=100)
+
     model_checkpoint = ModelCheckpoint(args.ckp_path,
                                        'accuracy', 1, 'max')
     log_callback = LogCallback(args.ckp_path)
@@ -42,7 +52,13 @@ def _parse_args():
     parser.add_argument('data_dir', type=str,
                         help='Directory that contains train.npz and'
                         'test.nzp generated with scripts/smallnorb2npz.py')
-    parser.add_argument('ckp_path', type=str, help='Path to store checkpoint and log')
+    parser.add_argument('ckp_path', type=str,
+                        help='Path to store checkpoint and log')
+    parser.add_argument('--arch', type=str, default='matrix_cnn',
+                        help='Architecture of network. Currently suport'
+                        'matrix_capsule, matrix_cnn, cnn')
+    parser.add_argument('--batch_size', type=int, default=128,
+                        help='Batch size for training.')
     args = parser.parse_args()
     return args
 
