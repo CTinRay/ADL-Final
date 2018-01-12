@@ -5,7 +5,8 @@ from tf_classifier_base import TFClassifierBase
 
 
 class CNNClassifier(TFClassifierBase):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, testing=False, **kwargs):
+        self._testing = testing
         super(CNNClassifier, self).__init__(*args, **kwargs)
 
     def _build_model(self):
@@ -23,7 +24,8 @@ class CNNClassifier(TFClassifierBase):
                  name='y'),
              'training': tf.placeholder(tf.bool, name='training')}
 
-        augmented = augmentate(placeholders['x'], placeholders['training'])
+        augmented = augmentate(placeholders['x'], placeholders['training'],
+                               testing=self._testing)
 
         # conv0
         conv0 = tf.layers.conv2d(
@@ -78,7 +80,7 @@ def _calc_shape(original_shape, stride, kernel_size):
     return shape
 
 
-def augmentate(img, training):
+def augmentate(img, training, testing=False):
     """Do image augmentation in tensorflow.
     """
     def aug_train():
@@ -92,7 +94,10 @@ def augmentate(img, training):
         augged = img[:, 8:40, 8:40, :]
         return augged
 
-    augged = tf.cond(training, aug_train, aug_test)
-    augged.set_shape([None, 32, 32, 1])
+    if not testing:
+        augged = tf.cond(training, aug_train, aug_test)
+    else:
+        augged = aug_test()
 
+    augged.set_shape([None, 32, 32, 1])
     return augged
