@@ -5,13 +5,13 @@ from tf_classifier_base import TFClassifierBase
 
 
 class CapsuleClassifier(TFClassifierBase):
-    def __init__(self, *args, A=32, B=32, C=32, D=32, **kwargs):
+    def __init__(self, *args, A=8, B=8, C=8, D=8, **kwargs):
         self.A = A
         self.B = B
         self.C = C
         self.D = D
         self.pose_shape = [4, 4]
-        super(CapsuleClassifier, self).__init__(*args)
+        super(CapsuleClassifier, self).__init__(*args, **kwargs)
 
     def _build_model(self):
         placeholders = \
@@ -28,12 +28,12 @@ class CapsuleClassifier(TFClassifierBase):
                  name='y'),
              'training': tf.placeholder(tf.bool, name='training')}
 
-        batch_size = tf.shape(placeholders['x'])[0]
-        img_shape = self._data_shape[0:2]
+        augmented = augmentate(placeholders['x'], placeholders['training'])
+        img_shape = [32, 32, 1]
 
         # conv0
         conv0 = tf.layers.conv2d(
-            placeholders['x'],
+            augmented,
             self.A,
             5,
             (2, 2),
@@ -90,14 +90,16 @@ class CapsuleClassifier(TFClassifierBase):
             class_pose, class_active = class_capsule(
                 conv_capsule2_pose,
                 conv_capsule2_active,
-                n_classes=int(self._n_classes))
+                n_classes=int(self._n_classes),
+                routing_iters=1)
 
         logits = class_active
         return placeholders, logits
 
     def _loss(self, placeholder_y, logits):
-        return tf.losses.sparse_softmax_cross_entropy(placeholder_y,
-                                                      logits)
+        one_hot_label = tf.one_hot(placeholder_y, self._n_classes)
+        return tf.losses.hinge_loss(one_hot_label,
+                                    logits)
 
 
 def _calc_shape(original_shape, stride, kernel_size):
@@ -108,3 +110,23 @@ def _calc_shape(original_shape, stride, kernel_size):
              (original_shape[1] - kernel_size) // stride + 1]
 
     return shape
+
+
+def augmentate(img, training):
+    """Do image augmentation in tensorflow.
+    """
+    def aug_train():
+        augged = tf.random_crop(img, [tf.shape(img)[0],
+                                      32, 32, 1])
+        augged = tf.image.random_brightness(augged, 0.1)
+        augged = tf.image.random_contrast(augged, 0.8, 1.2)
+        return augged
+
+    def aug_test():
+        augged = img[:, 8:40, 8:40, :]
+        return augged
+
+    augged = tf.cond(training, aug_train, aug_test)
+    augged.set_shape([None, 32, 32, 1])
+
+    return augged
