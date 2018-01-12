@@ -4,7 +4,9 @@ import pdb
 import sys
 import traceback
 import numpy as np
+from IPython.terminal.embed import embed
 from capsule_classifier import CapsuleClassifier
+from callbacks import ModelCheckpoint
 from dataset import SmallNORBDataset
 
 
@@ -16,9 +18,15 @@ def main(args):
     train, valid = smallnorb.get_train_valid()
 
     classifier = CapsuleClassifier(train['x'].shape[1:],
-                                   np.max(train['y'] + 1),
-                                   valid=valid)
-    classifier.fit(train['x'], train['y'])
+                                   np.max(train['y']) + 1,
+                                   valid=valid,
+                                   batch_size=128,
+                                   n_epochs=100)
+    model_checkpoint = ModelCheckpoint(args.ckp_path,
+                                       'loss', 1, 'max')
+    classifier.fit(train['x'], train['y'],
+                   callbacks=[model_checkpoint])
+    print(classifier.predict_prob(train['x']))
 
 
 def _parse_args():
@@ -27,6 +35,7 @@ def _parse_args():
     parser.add_argument('data_dir', type=str,
                         help='Directory that contains train.npz and'
                         'test.nzp generated with scripts/smallnorb2npz.py')
+    parser.add_argument('ckp_path', type=str, help='Path to store checkpoint')
     args = parser.parse_args()
     return args
 
