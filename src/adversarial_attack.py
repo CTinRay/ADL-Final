@@ -82,7 +82,8 @@ def main(args):
         classifier = MatrixCNNClassifier(test['x'].shape[1:],
                                          n_classes,
                                          batch_size=args.batch_size,
-                                         n_epochs=100)
+                                         n_epochs=100,
+                                         testing=True)
     elif args.arch == 'cnn':
         classifier = CNNClassifier(test['x'].shape[1:],
                                    n_classes,

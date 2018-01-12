@@ -5,7 +5,8 @@ from tf_classifier_base import TFClassifierBase
 
 
 class MatrixCNNClassifier(TFClassifierBase):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, testing=False, **kwargs):
+        self._testing = testing
         self.pose_shape = [16, 16]
         super(MatrixCNNClassifier, self).__init__(*args, **kwargs)
 
@@ -24,7 +25,8 @@ class MatrixCNNClassifier(TFClassifierBase):
                  name='y'),
              'training': tf.placeholder(tf.bool, name='training')}
 
-        augmented = augmentate(placeholders['x'], placeholders['training'])
+        augmented = augmentate(placeholders['x'], placeholders['training'],
+                               self._testing)
         img_shape = [32, 32, 1]
 
         # conv0
@@ -60,6 +62,7 @@ class MatrixCNNClassifier(TFClassifierBase):
                 primary_cnn_matrix,
                 kernel_size=3,
                 stride=2)
+            cnn1_matrix = tf.nn.leaky_relu(cnn1_matrix)
 
         # capsule2
         with tf.variable_scope('matrix_cnn2'):
@@ -67,6 +70,7 @@ class MatrixCNNClassifier(TFClassifierBase):
                 cnn1_matrix,
                 kernel_size=3,
                 stride=1)
+            cnn2_matrix = tf.nn.leaky_relu(cnn2_matrix)
 
         # class capsule
         with tf.variable_scope('fully_connected'):
@@ -81,9 +85,11 @@ class MatrixCNNClassifier(TFClassifierBase):
         return placeholders, logits
 
     def _loss(self, placeholder_y, logits):
-        one_hot_label = tf.one_hot(placeholder_y, self._n_classes)
-        return tf.losses.hinge_loss(one_hot_label,
-                                    logits)
+        # one_hot_label = tf.one_hot(placeholder_y, self._n_classes)
+        # return tf.losses.hinge_loss(one_hot_label,
+        #                             logits)
+        return tf.losses.sparse_softmax_cross_entropy(placeholder_y,
+                                                      logits)
 
 
 def _calc_shape(original_shape, stride, kernel_size):
@@ -96,7 +102,7 @@ def _calc_shape(original_shape, stride, kernel_size):
     return shape
 
 
-def augmentate(img, training):
+def augmentate(img, training, testing=False):
     """Do image augmentation in tensorflow.
     """
     def aug_train():
@@ -110,7 +116,11 @@ def augmentate(img, training):
         augged = img[:, 8:40, 8:40, :]
         return augged
 
-    augged = tf.cond(training, aug_train, aug_test)
+    if not testing:
+        augged = tf.cond(training, aug_train, aug_test)
+    else:
+        augged = aug_test()
+
     augged.set_shape([None, 32, 32, 1])
 
     return augged
