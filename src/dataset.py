@@ -20,8 +20,11 @@ class SmallNORBDataset:
     """
 
     def __init__(self, train_npz, test_npz):
-        self.train_data_raw = np.load(train_npz)
-        self.test_data_raw = np.load(test_npz)
+        if train_npz is not None:
+            self.train_data_raw = np.load(train_npz)
+
+        if test_npz is not None:
+            self.test_data_raw = np.load(test_npz)
 
     def _preprocess_image(self, imgs):
         # convert color [0, 255] to [-1, +1]
@@ -68,3 +71,18 @@ class SmallNORBDataset:
         valid['x'] = self._preprocess_image(valid['x'])
 
         return train, valid
+
+    def get_test(self):
+        test = {
+            'x': np.concatenate([self.test_data_raw['lt'],
+                                 self.test_data_raw['rt']],
+                                axis=0),
+            'y': np.concatenate(
+                [self.test_data_raw['category'],
+                 self.test_data_raw['category']], axis=0)
+        }
+        test['x'] = self._preprocess_image(test['x'])
+        return test
+
+    def get_n_classes(self):
+        return 5
