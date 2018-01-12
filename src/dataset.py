@@ -36,14 +36,14 @@ class SmallNORBDataset:
         imgs = np.expand_dims(imgs, -1)
         return imgs
 
-    def get_train_valid(self, valid_category=0):
+    def get_train_valid(self, valid_instance=4):
         """Get train and valid data.
 
         Args:
             valid_category (int): Category to be used as validation dataset.
         """
         train_indices = np.where(
-            self.train_data_raw['category'] != valid_category)
+            self.train_data_raw['instance'] != valid_instance)
         train = {
             'x': np.concatenate([self.train_data_raw['lt'][train_indices],
                                  self.train_data_raw['rt'][train_indices]],
@@ -54,7 +54,7 @@ class SmallNORBDataset:
         }
 
         valid_indices = np.where(
-            self.train_data_raw['category'] == valid_category)
+            self.train_data_raw['instance'] == valid_instance)
         valid = {
             'x': np.concatenate([self.train_data_raw['lt'][valid_indices],
                                  self.train_data_raw['rt'][valid_indices]],

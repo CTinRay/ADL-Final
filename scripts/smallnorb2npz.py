@@ -16,28 +16,35 @@ def data2np(data):
     image_lt = []
     image_rt = []
     categories = []
+    instances = []
     for exp in data:
         image_lt.append(exp.image_lt)
         image_rt.append(exp.image_rt)
         categories.append(exp.category)
+        instances.append(exp.instance)
 
     image_lt = np.array(image_lt)
     image_rt = np.array(image_rt)
     categories = np.array(categories)
+    instances = np.array(instances)
 
-    return image_lt, image_rt, categories
+    return image_lt, image_rt, categories, instances
 
 
 def main(args):
     smallnorb = SmallNORBDataset(args.data_dir)
 
-    image_lt, image_rt, categories = data2np(smallnorb.data['train'])
+    image_lt, image_rt, categories, instances \
+        = data2np(smallnorb.data['train'])
     np.savez_compressed(os.path.join(args.dest_dir, 'train.npz'),
-                        lt=image_lt, rt=image_rt, category=categories)
+                        lt=image_lt, rt=image_rt,
+                        category=categories, instance=instances)
 
-    image_lt, image_rt, categories = data2np(smallnorb.data['test'])
+    image_lt, image_rt, categories, instances \
+        = data2np(smallnorb.data['test'])
     np.savez_compressed(os.path.join(args.dest_dir, 'test.npz'),
-                        lt=image_lt, rt=image_rt, category=categories)
+                        lt=image_lt, rt=image_rt,
+                        category=categories, instance=instances)
 
 
 def _parse_args():
