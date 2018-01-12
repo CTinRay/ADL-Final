@@ -27,13 +27,17 @@ class SmallNORBDataset:
             self.test_data_raw = np.load(test_npz)
 
     def _preprocess_image(self, imgs):
-        # convert color [0, 255] to [-1, +1]
         imgs = imgs.astype(np.float32)
-        imgs = (imgs - 128) / 128
 
         # downsample to 48x48
         imgs = imgs[:, ::2, ::2]
         assert imgs.shape[1:] == (48, 48)
+
+        # calculate mean/var
+        flatten = imgs.reshape(imgs.shape[0], -1)
+        mean = np.mean(flatten, axis=-1).reshape(-1, 1, 1)
+        std = np.std(flatten, axis=-1).reshape(-1, 1, 1)
+        imgs = (imgs - mean) / std
 
         # expand channel dimension
         imgs = np.expand_dims(imgs, -1)
