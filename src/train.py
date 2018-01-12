@@ -39,7 +39,7 @@ def main(args):
                                    n_epochs=100)
 
     model_checkpoint = ModelCheckpoint(args.ckp_path,
-                                       'accuracy', 1, 'max')
+                                       'loss', 1, 'min')
     log_callback = LogCallback(args.ckp_path)
     classifier.fit(train['x'], train['y'],
                    callbacks=[model_checkpoint, log_callback])
@@ -48,7 +48,7 @@ def main(args):
 
 def _parse_args():
     parser = argparse.ArgumentParser(
-        description="Transform SmallNORB dataset to npz")
+        description="Script to train model.")
     parser.add_argument('data_dir', type=str,
                         help='Directory that contains train.npz and'
                         'test.nzp generated with scripts/smallnorb2npz.py')
