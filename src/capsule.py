@@ -3,6 +3,9 @@ import math
 import tensorflow as tf
 
 
+EPSILON = 1e-5
+
+
 def conv_capsule(inputs, activation, kernel_size, stride, channels_out,
                  routing_iters=3):
     """Build capsule convolution layer.
@@ -81,12 +84,13 @@ def conv_capsule(inputs, activation, kernel_size, stride, channels_out,
 
     # weights of transform matrices
     transform_matrices = tf.get_variable(
-        'transform_matrices',
+        'transform_matrics',
         shape=[channels_out,
                kernel_size ** 2,
                channels_in,
                pose_shape[1],
-               pose_shape[1]])
+               pose_shape[1]],
+        initializer=tf.truncated_normal_initializer())
     transform_matrices = tf.reshape(
         transform_matrices,
         [1,  # batch_size
@@ -144,7 +148,8 @@ def conv_capsule(inputs, activation, kernel_size, stride, channels_out,
     with tf.variable_scope('em_routing', reuse=tf.AUTO_REUSE):
         output_poses, output_actives = conv_em_routing(
             conv_active, conv_votes, stride, routing_iters)
-
+    # conv_votes = conv_votes * tf.expand_dims(tf.expand_dims(conv_active, 3), -1)
+    # output_poses = tf.reduce_mean(conv_votes, [-2, -3])
     output_poses = tf.reshape(
         output_poses,
         [batch_size,
@@ -154,6 +159,7 @@ def conv_capsule(inputs, activation, kernel_size, stride, channels_out,
          pose_shape[0],
          pose_shape[1]])
 
+    # output_actives = tf.reduce_mean(output_poses ** 2, [-1, -2])
     return output_poses, output_actives
 
 
@@ -297,7 +303,7 @@ def _renorm_r(r, stride):
          channels_in])
 
     # renorm r by divide original r with conv_r_sum
-    conv_r_renormed = r / tf.expand_dims(conv_r_sum, 3)
+    conv_r_renormed = r / (tf.expand_dims(conv_r_sum, 3) + EPSILON)
     assert conv_r_renormed.shape[1:] == r.shape[1:]
 
     return conv_r_renormed
@@ -329,7 +335,8 @@ def _conv_e_step(m, s, a_prime, v, stride):
                     kernel_size ** 2, channels_in]
     """
     p_exp = - tf.reduce_sum((v - tf.expand_dims(tf.expand_dims(m, 4), 5)) ** 2
-                            / (2 * tf.expand_dims(tf.expand_dims(s, 4), 5)),
+                            / (2 * tf.expand_dims(tf.expand_dims(s, 4), 5)
+                               + EPSILON),
                             -1)
     assert p_exp.shape[1:] == [
         v.shape[1],                 # output_height
@@ -343,7 +350,7 @@ def _conv_e_step(m, s, a_prime, v, stride):
                        -1),
         -1)
 
-    p = tf.exp(p_exp) / p_denominator
+    p = tf.exp(p_exp) / (p_denominator + EPSILON)
     r = p * tf.expand_dims(tf.expand_dims(a_prime, -1), -1)
     r = _renorm_r(r, stride)
 
@@ -394,7 +401,7 @@ def _conv_m_step(r, a, v, inv_tempt):
                                v.shape[3],   # channels_out
                                1]            # for broadcast
 
-    m = sum_rv / sum_r
+    m = tf.div(sum_rv, sum_r + EPSILON, name='m')
     assert m.shape[1:] == sum_rv.shape[1:]
 
     r_square_v_minus_m = \
@@ -404,12 +411,14 @@ def _conv_m_step(r, a, v, inv_tempt):
         tf.reduce_sum(r_square_v_minus_m, 5), 4)
     assert sum_r_square_v_minus_m.shape[1:] == m.shape[1:]
 
-    square_s = sum_r_square_v_minus_m / sum_r
-    s = tf.sqrt(square_s)
+    square_s = sum_r_square_v_minus_m / (sum_r + EPSILON)
+    s = tf.sqrt(square_s, name='s')
     assert s.shape[1:] == m.shape[1:]
 
     beta_v = tf.get_variable('beta_v', [1])
-    cost = (beta_v + tf.log(s)) * sum_r
+
+    # with tf.control_dependencies([tf.Assert(tf.reduce_min(s) > 0, [s])]):
+    cost = (beta_v + tf.log(s + EPSILON)) * sum_r
 
     beta_a = tf.get_variable('beta_a', [1])
     a_prime = tf.sigmoid(inv_tempt *
@@ -422,7 +431,7 @@ def _conv_m_step(r, a, v, inv_tempt):
 
 
 def class_capsule(inputs, activation, n_classes,
-                  routing_iters=3):
+                  routing_iters=1):
     """Build class capsule layer.
 
     Args:
@@ -454,11 +463,12 @@ def class_capsule(inputs, activation, n_classes,
 
     # weights of transform matrices
     transform_matrices = tf.get_variable(
-        'transform_matrices',
+        'transform_matrics',
         shape=[n_classes,
                channels_in,
                pose_shape[0],
-               pose_shape[0]])
+               pose_shape[0]],
+        initializer=tf.truncated_normal_initializer())
 
     # matric transformation
     tiled_transform_matrics = tf.tile(
