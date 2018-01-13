@@ -1,12 +1,15 @@
 import pdb
 import tensorflow as tf
+from losses import sparse_seperate_margin_loss, sparse_spread_loss
 from matrix_cnn import matrix_cnn
 from tf_classifier_base import TFClassifierBase
 
 
 class CNNClassifier(TFClassifierBase):
-    def __init__(self, *args, testing=False, **kwargs):
+    def __init__(self, *args,
+                 testing=False, loss_fn='crossentropy', **kwargs):
         self._testing = testing
+        self._loss_fn = loss_fn
         super(CNNClassifier, self).__init__(*args, **kwargs)
 
     def _build_model(self):
@@ -66,8 +69,19 @@ class CNNClassifier(TFClassifierBase):
         # one_hot_label = tf.one_hot(placeholder_y, self._n_classes)
         # return tf.losses.hinge_loss(one_hot_label,
         #                             logits)
-        return tf.losses.sparse_softmax_cross_entropy(placeholder_y,
-                                                      logits)
+        if self._loss_fn == 'crossentropy':
+            return tf.losses.sparse_softmax_cross_entropy(placeholder_y,
+                                                          logits)
+        elif self._loss_fn == 'spread':
+            # if self._testing:
+            #     m = 0.9
+            # else:
+            #     m = 0.7 * (self._epoch - self._n_epochs) / self._n_epochs \
+            #          + 0.2
+            m = 0.2
+            return sparse_spread_loss(placeholder_y, logits, m)
+        elif self._loss_fn == 'seperate_margin':
+            return sparse_seperate_margin_loss(placeholder_y, logits)
 
 
 def _calc_shape(original_shape, stride, kernel_size):

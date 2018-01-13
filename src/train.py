@@ -36,7 +36,8 @@ def main(args):
                                    np.max(train['y']) + 1,
                                    valid=valid,
                                    batch_size=args.batch_size,
-                                   n_epochs=100)
+                                   n_epochs=100,
+                                   loss_fn=args.loss)
 
     model_checkpoint = ModelCheckpoint(args.ckp_path,
                                        'loss', 1, 'min')
@@ -55,10 +56,13 @@ def _parse_args():
     parser.add_argument('ckp_path', type=str,
                         help='Path to store checkpoint and log')
     parser.add_argument('--arch', type=str, default='matrix_cnn',
-                        help='Architecture of network. Currently suport'
+                        help='Architecture of network. Currently support'
                         'matrix_capsule, matrix_cnn, cnn')
     parser.add_argument('--batch_size', type=int, default=128,
                         help='Batch size for training.')
+    parser.add_argument('--loss', type=str, default='crossentropy',
+                        help='Loss function to use. Currently support loss'
+                        'functions are crossentropy, seperate_margin, spread')
     args = parser.parse_args()
     return args
 

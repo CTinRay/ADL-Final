@@ -89,7 +89,8 @@ def main(args):
                                    n_classes,
                                    batch_size=args.batch_size,
                                    n_epochs=100,
-                                   testing=True)
+                                   testing=True,
+                                   loss_fn=args.loss)
 
     classifier.load(args.ckp_path)
     accuracy = adversarial_attack(classifier, test,
@@ -127,6 +128,9 @@ def _parse_args():
     parser.add_argument('--method', type=str, default='FGSM',
                         help='Method of adversarial attack. Currently'
                              'support FGSM and BIM')
+    parser.add_argument('--loss', type=str, default='crossentropy',
+                        help='Loss function to use. Currently support loss'
+                        'functions are crossentropy, seperate_margin, spread')
     args = parser.parse_args()
     return args
 
