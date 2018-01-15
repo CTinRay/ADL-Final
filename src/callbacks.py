@@ -24,20 +24,22 @@ class ModelCheckpoint(Callback):
 
     def on_epoch_end(self, log_train, log_valid, model):
         score = log_valid[self._monitor]
-        if self._mode == 'min':
+        if self._mode == 'all':
+            model.save(self._filepath)
+            if self._verbose > 0:
+                print('Model saved (%f)' % score)
+        elif self._mode == 'min':
             if score < self._best:
                 self._best = score
                 model.save(self._filepath)
                 if self._verbose > 0:
                     print('Best model saved (%f)' % score)
-
-        else:
+        elif self._mode == 'max':
             if score > self._best:
                 self._best = score
                 model.save(self._filepath)
                 if self._verbose > 0:
                     print('Best model saved (%f)' % score)
-
 
 class LogCallback(Callback):
     def __init__(self, path):
