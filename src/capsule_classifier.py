@@ -2,7 +2,7 @@ import pdb
 import tensorflow as tf
 from capsule import conv_capsule, class_capsule
 from tf_classifier_base import TFClassifierBase
-
+from losses import sparse_spread_loss
 
 class CapsuleClassifier(TFClassifierBase):
     def __init__(self, *args, A=8, B=8, C=8, D=8, **kwargs):
@@ -97,9 +97,7 @@ class CapsuleClassifier(TFClassifierBase):
         return placeholders, logits
 
     def _loss(self, placeholder_y, logits):
-        one_hot_label = tf.one_hot(placeholder_y, self._n_classes)
-        return tf.losses.hinge_loss(one_hot_label,
-                                    logits)
+        return sparse_spread_loss(placeholder_y, logits)
 
 
 def _calc_shape(original_shape, stride, kernel_size):
