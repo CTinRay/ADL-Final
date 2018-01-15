@@ -79,6 +79,8 @@ if __name__ == '__main__':
     args = _parse_args()
     try:
         main(args)
+    except KeyboardInterrupt:
+        pass
     except:
         type, value, tb = sys.exc_info()
         traceback.print_exc()
