@@ -13,7 +13,6 @@ import pdb
 import sys
 import traceback
 import numpy as np
-from IPython.terminal.embed import embed
 from capsule_classifier import CapsuleClassifier
 from matrix_cnn_classifier import MatrixCNNClassifier
 from cnn_classifier import CNNClassifier
