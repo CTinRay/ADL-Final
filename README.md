@@ -53,7 +53,7 @@ python3 adversarial_attack.py ./data/SmallNORB/ ./models/cnn-spread/ adversarial
 Then the accuracy for different epsilon can be found in the file `adversarial-attack-BIM.log`.
 
 ## Authors
-* **Tin-Ray Chiang** - *Initial work* - [CTinRay](https://github.com/CTinRay)
+* **Tin-Ray Chiang** - *Initial work* including CapsNet/CNN/matrix CNN implementation and comparison, adversarial attack reproduce and exploration - [CTinRay](https://github.com/CTinRay)
 * **Yen-Ting Liu** - Clean up, filter visualization, benchmarks - [liuyenting](https://github.com/liuyenting)
 
 ## License
