@@ -6,13 +6,11 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites
 
-You will need python3.5 and
+You will need `python3.5` and
 
-```
-numpy 1.13.3
-tensorflow (tensorflow-gpu) >= 1.4
-tqdm 4.19.2
-```
+* `numpy` == 1.13.3
+* `tensorflow` (`tensorflow-gpu`) >= 1.4
+* `tqdm` == 4.19.2
 
 Our experiments are run on `Ubuntu 16.04.2 LTS` with kernel version `4.4.0-97-generic`, CPU `E5-2640 v4`, RAM 94.2G and GPU GTX 1080. But there should be no specific system requirement, except an NVIDIA graphic card if you want GPU acceleration.
 
@@ -56,7 +54,7 @@ Then the accuracy for different epsilon can be found in the file `adversarial-at
 
 ## Authors
 * **Tin-Ray Chiang** - *Initial work* - [CTinRay](https://github.com/CTinRay)
-* **Yen-Ting Liu** - Clean up and filter visualization - [liuyenting](https://github.com/liuyenting)
+* **Yen-Ting Liu** - Clean up, filter visualization, benchmarks - [liuyenting](https://github.com/liuyenting)
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
