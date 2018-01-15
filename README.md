@@ -2,36 +2,25 @@
 Re-implement the CapsNet described in "[Matrix Capsules with EM Routing](https://openreview.net/pdf?id=HJWLfGWRb)".
 
 ## Getting Started
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
+These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
 
 ### Prerequisites
-What things you need to install the software and how to install them
+You will need
 ```
-Give examples
+tensorflow (tensorflow-gpu) >= 1.4
+tqdm
 ```
 
 ### Installing
-A step by step series of examples that tell you have to get a development env running
-
-Say what the step will be
-```
-Give the example
-```
-And repeat
-```
-until finished
-```
-End with an example of getting some data out of the system or using it for a little demo
+Nothing specific to install.
 
 ## Running the tests
-Explain how to run the automated tests for this system
-
-### Break down into end to end tests
-Explain what these tests test and why
-
+**TODO** download smallNORM dataset using `scripts`  
+Assuming the dataset is located under folder `data` and the results will be stored under `logs`
 ```
-Give an example
+python src/train.py data logs
 ```
+batch size is default to 128.
 
 ## Authors
 * **Tin-Ray Chiang** - *Initial work* - [CTinRay](https://github.com/CTinRay)
