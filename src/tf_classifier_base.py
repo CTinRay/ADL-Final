@@ -102,6 +102,10 @@ class TFClassifierBase:
             self._placeholders, self._logits \
               = self._build_model()
 
+        # save graph summary
+        with tf.summary.FileWriter('logs', self._session.graph) as writer:
+            self._session.run(tf.global_variables_initializer())
+
     def fit(self, X, y, callbacks=[]):
         # make loss tensor
         reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
