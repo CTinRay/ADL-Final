@@ -1,3 +1,12 @@
+import logging
+handler = logging.StreamHandler()
+formatter = logging.Formatter(
+    '%(levelname).1s %(asctime)s [%(name)s] %(message)s', '%H:%M:%S'
+)
+handler.setFormatter(formatter)
+logging.basicConfig(level=logging.DEBUG, handlers=[handler])
+logger = logging.getLogger(__name__)
+
 import argparse
 import os
 import pdb
@@ -39,8 +48,7 @@ def main(args):
                                    n_epochs=100,
                                    loss_fn=args.loss)
 
-    model_checkpoint = ModelCheckpoint(args.ckp_path,
-                                       'loss', 1, 'all')
+    model_checkpoint = ModelCheckpoint(args.ckp_path, 'loss', 'all')
     log_callback = LogCallback(args.ckp_path)
     classifier.fit(train['x'], train['y'],
                    callbacks=[model_checkpoint, log_callback])

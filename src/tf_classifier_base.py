@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import os
 import numpy as np
 import tensorflow as tf
@@ -57,13 +60,14 @@ class TFClassifierBase:
         # put metric score in summary and print them
         epoch_log = {}
         epoch_log['loss'] = float(loss)
-        print('loss=%f' % loss)
+        logger.info('loss=%f' % loss)
+        msg = ''
         for metric in self._metrics:
             score = float(metrics[metric][1])
             epoch_log[metric] = score
-            print(', %s=%f' % (metric, score), end='')
+            msg += ', %s=%f' % (metric, score)
+        logger.info(msg)
 
-        print('\n', end='')
         return epoch_log
 
     def __init__(self, data_shape, n_classes,
@@ -99,8 +103,7 @@ class TFClassifierBase:
 
         # build graph
         with tf.variable_scope('TF-Classifier') as scope:
-            self._placeholders, self._logits \
-              = self._build_model()
+            self._placeholders, self._logits = self._build_model()
 
         # save graph summary
         with tf.summary.FileWriter('logs', self._session.graph) as writer:
@@ -135,13 +138,13 @@ class TFClassifierBase:
         # Start the training loop.
         while self._epoch < self._n_epochs:
             # train and evaluate train score
-            print('training %i' % self._epoch)
+            logger.info('training %i' % self._epoch)
             log_train = self._iter(X, y, loss, train_op,
                                    metric_tensors)
 
             # evaluate valid score
             if self._valid is not None:
-                print('evaluating %i' % self._epoch)
+                logger.info('evaluating %i' % self._epoch)
                 log_valid = self._iter(self._valid['x'],
                                        self._valid['y'], loss, None,
                                        metric_tensors)
