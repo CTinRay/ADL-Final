@@ -48,8 +48,7 @@ def main(args):
                                    n_epochs=100,
                                    loss_fn=args.loss)
 
-    model_checkpoint = ModelCheckpoint(args.ckp_path,
-                                       'loss', 1, 'all')
+    model_checkpoint = ModelCheckpoint(args.ckp_path, 'loss', 'all')
     log_callback = LogCallback(args.ckp_path)
     classifier.fit(train['x'], train['y'],
                    callbacks=[model_checkpoint, log_callback])

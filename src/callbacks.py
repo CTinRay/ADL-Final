@@ -17,10 +17,8 @@ class Callback:
 class ModelCheckpoint(Callback):
     def __init__(self, filepath,
                  monitor='loss',
-                 verbose=0,
                  mode='min'):
         self._filepath = filepath
-        self._verbose = verbose
         self._monitor = monitor
         self._best = math.inf if mode == 'min' else - math.inf
         self._mode = mode
@@ -29,20 +27,17 @@ class ModelCheckpoint(Callback):
         score = log_valid[self._monitor]
         if self._mode == 'all':
             model.save(self._filepath)
-            if self._verbose > 0:
-                print('Model saved (%f)' % score)
+            logger.info('Model saved (%f)' % score)
         elif self._mode == 'min':
             if score < self._best:
                 self._best = score
                 model.save(self._filepath)
-                if self._verbose > 0:
-                    print('Best model saved (%f)' % score)
+                logger.info('Best model saved (%f)' % score)
         elif self._mode == 'max':
             if score > self._best:
                 self._best = score
                 model.save(self._filepath)
-                if self._verbose > 0:
-                    print('Best model saved (%f)' % score)
+                logger.info('Best model saved (%f)' % score)
 
 class LogCallback(Callback):
     def __init__(self, path):
