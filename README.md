@@ -56,6 +56,7 @@ Then the accuracy for different epsilon can be found in the file `adversarial-at
 
 ## Authors
 * **Tin-Ray Chiang** - *Initial work* - [CTinRay](https://github.com/CTinRay)
+* **Yen-Ting Liu** - Clean up and filter visualization - [liuyenting](https://github.com/liuyenting)
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
