@@ -22,7 +22,7 @@ Nothing specific to install.
 
 Our script only accepts npz file format. So to play with SmallNORB, some conversion is required.
 
-First you need to download script from https://github.com/ndrplz/small_norb/blob/master/smallnorb/dataset.py to folder `scripts`, then download [SmallNORB dataset](https://cs.nyu.edu/~ylclab/data/norb-v1.0-small/) to some folder. Then run
+First you need to download script from https://github.com/ndrplz/small_norb/blob/master/smallnorb/dataset.py to folder `scripts`, then download [SmallNORB dataset](https://cs.nyu.edu/~ylclab/data/norb-v1.0-small/) to some folder. Then `gunzip` them and run
 
 ```
 python smallnorb2npz.py [SmallNORB-bin] [SmallNORB-npz]
