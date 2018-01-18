@@ -11,6 +11,7 @@ You will need `python3.5` and
 * `numpy` == 1.13.3
 * `tensorflow` (`tensorflow-gpu`) >= 1.4
 * `tqdm` == 4.19.2
+* `matplotlib` == 2.1.1
 
 Our experiments are run on `Ubuntu 16.04.2 LTS` with kernel version `4.4.0-97-generic`, CPU `E5-2640 v4`, RAM 94.2G and GPU GTX 1080. But there should be no specific system requirement, except an NVIDIA graphic card if you want GPU acceleration.
 
